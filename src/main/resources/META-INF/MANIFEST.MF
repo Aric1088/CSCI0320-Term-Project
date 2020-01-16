@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Main-Class: edu.brown.cs.term_project_azhuang_cschlaik_gwu7_okansper.m
+ ain.Main
+

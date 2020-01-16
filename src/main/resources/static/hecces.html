@@ -1,0 +1,101 @@
+<html>
+<head>
+    <script src="js/pcm-player.min.js"></script>
+    <script>
+        let player = false;
+        let safari = false;
+        let calculated_offset = 0;
+        let has_started = false;
+        let host = "hecces.devices.brown.edu";
+        setInterval(() => {
+            let sentTime = (new Date).getTime();
+            let url = "http://" + host + ":4567";
+
+            fetch(url + "/icecoffee/time")
+                .then(response => response.json())
+                .then(data => {
+                    debug("whomst")
+                    let received = data.received;
+                    let sent = data.sent;
+                    let totalOffset = (received - sentTime) + (sent - (new Date).getTime());
+                    calculated_offset = totalOffset / 2;
+                    let delay = (((new Date).getTime() - sentTime) - (sent - received)) / 2;
+                    calculated_offset -= delay;
+                    let ceilServerTime = Math.ceil((received) / 1000) * 1000;
+                    if (!has_started && !safari) {
+                        setTimeout(() => {
+
+                            player.flush();
+
+
+                            visualizer = true;
+                        }, ceilServerTime - received);
+                        // has_started = true;
+                    }
+                })
+        }, 1000);
+        const MESSAGE_TYPE = {
+            CONNECT: 0,
+            CHUNK: 1,
+            SYNC: 2
+        };
+
+        function setup_audio_stream() {
+
+            player = new PCMPlayer();
+            has_started = true;
+        }
+
+        function debug(string) {
+            var element = document.getElementById("debug");
+            var p = document.createElement("p");
+            p.appendChild(document.createTextNode(string));
+            element.appendChild(p);
+        }
+
+        var ws = new WebSocket("ws://hecces.devices.brown.edu:4567/stream");
+        ws.onopen = function () {
+            debug("WebSocket open")
+        };
+        ws.onmessage = msg => {
+            const data = JSON.parse(msg.data);
+            switch (data.type) {
+                default:
+                    console.log("hecces");
+                    break;
+                case MESSAGE_TYPE.CHUNK:
+                    if (player) {
+                        let hecces = new Uint8Array(JSON.parse(data.payload.chunky));
+                        feed_data(data.payload.time, hecces);
+                        console.log(new Uint8Array(JSON.parse(data.payload.chunky)));
+                    }
+                    break;
+            }
+
+
+        };
+
+        function feed_data(time_stamp, data) {
+            resynchronize(time_stamp, data);
+        }
+
+        function resynchronize(time_stamp, data) {
+            //Update the synchronized client time
+            let synced_client_time = (new Date().getTime()) + calculated_offset;
+            console.log(time_stamp - synced_client_time, data);
+            setTimeout((data) => {
+                player.feed(data);
+                // player.flush();
+            }, time_stamp - synced_client_time, data);
+        }
+
+        ws.onclose = function (event) {
+            debug("WebSocket closed")
+        }
+    </script>
+</head>
+<body>
+<button onclick="setup_audio_stream()">Click me</button>
+<div id="debug"></div>
+</body>
+</html>
